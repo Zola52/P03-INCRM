@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>سیستم مدیریت تماس و مشتریان (CRM)</title>
+    
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- فونت فارسی Vazirmatn از CDN عمومی -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css">
+    
+    <style>
+        * {
+            font-family: 'Vazirmatn', 'IRANSans', sans-serif !important;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+            min-height: 100vh;
+        }
+        
+        .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        
+        .status-yellow { background-color: #fbbf24; color: #000; }
+        .status-purple { background-color: #c084fc; color: #fff; }
+        .status-green { background-color: #34d399; color: #000; }
+        .status-red { background-color: #f87171; color: #fff; }
+        .status-blue { background-color: #60a5fa; color: #fff; }
+        
+        .card-hover {
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        
+        .card-hover:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.3);
+        }
+        
+        .persian-date-picker {
+            position: absolute;
+            background: white;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            padding: 16px;
+            z-index: 1000;
+            min-width: 320px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+        }
+        
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 4px;
+            margin-top: 12px;
+        }
+        
+        .calendar-day {
+            padding: 8px;
+            text-align: center;
+            border-radius: 4px;
+            cursor: pointer;
+            background: #f1f5f9;
+            font-size: 12px;
+            transition: all 0.2s;
+        }
+        
+        .calendar-day:hover {
+            background: #e2e8f0;
+        }
+        
+        .calendar-day.selected {
+            background: #38bdf8;
+            color: white;
+            font-weight: bold;
+        }
+        
+        .calendar-day.today {
+            background: #fbbf24;
+            font-weight: bold;
+        }
+        
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.7);
+            z-index: 999;
+        }
+        
+        .modal-overlay.active {
+            display: flex;
+        }
+        
+        .sidebar-nav a {
+            transition: all 0.3s ease;
+        }
+        
+        .sidebar-nav a:hover {
+            padding-right: 8px;
+            background: rgba(56, 189, 248, 0.1);
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white">
+    <!-- Modal Overlay -->
+    <div id="modalOverlay" class="modal-overlay items-center justify-center">
+        <div id="modalContent" class="bg-slate-800 rounded-lg p-8 w-96 max-h-96 overflow-y-auto">
+            <!-- محتوای مدال توسط JavaScript جایگزین می‌شود -->
+        </div>
+    </div>
+
+    <div class="flex h-screen">
+        <!-- Sidebar -->
+        <aside class="w-64 bg-slate-800 border-r border-slate-700 p-6 overflow-y-auto">
+            <div class="mb-8">
+                <h1 class="text-2xl font-bold text-cyan-400 mb-2">📱 CRM</h1>
+                <p class="text-sm text-slate-400">سیستم مدیریت مشتریان</p>
+            </div>
+
+            <nav class="sidebar-nav space-y-4">
+                <button id="navDashboard" class="w-full text-right px-4 py-2 rounded-lg bg-cyan-600 hover:bg-cyan-700 transition">
+                    📊 داشبورد
+                </button>
+                <button id="navContacts" class="w-full text-right px-4 py-2 rounded-lg hover:bg-slate-700 transition">
+                    👥 مشتریان
+                </button>
+                <button id="navTasks" class="w-full text-right px-4 py-2 rounded-lg hover:bg-slate-700 transition">
+                    ✅ وظایف
+                </button>
+                <button id="navAddContact" class="w-full text-right px-4 py-2 rounded-lg bg-green-600 hover:bg-green-700 transition">
+                    ➕ افزودن مشتری
+                </button>
+            </nav>
+
+            <div class="mt-8 pt-6 border-t border-slate-700">
+                <button id="exportBtn" class="w-full text-right px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 transition text-sm">
+                    💾 صادرات داده‌ها
+                </button>
+                <button id="importBtn" class="w-full text-right px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 transition text-sm mt-2">
+                    📥 وارد کردن داده‌ها
+                </button>
+            </div>
+
+            <div class="mt-6 p-4 bg-slate-700 rounded-lg text-xs text-slate-300">
+                <p class="mb-2"><strong>وضعیت‌های لید:</strong></p>
+                <ul class="space-y-1">
+                    <li>🟡 تلاش برای تماس</li>
+                    <li>🟣 جلسه حضوری</li>
+                    <li>🔵 پیگیری مجدد</li>
+                    <li>🏆 فروش موفق</li>
+                    <li>🔴 بایگانی</li>
+                </ul>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="flex-1 overflow-y-auto">
+            <!-- Dashboard View -->
+            <section id="dashboardView" class="p-8">
+                <h2 class="text-3xl font-bold mb-8">📊 داشبورد</h2>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                    <div class="bg-slate-800 rounded-lg p-6 border-r-4 border-yellow-400">
+                        <p class="text-slate-400 text-sm">🟡 تلاش برای تماس</p>
+                        <p id="statCalling" class="text-3xl font-bold mt-2">0</p>
+                    </div>
+                    <div class="bg-slate-800 rounded-lg p-6 border-r-4 border-purple-400">
+                        <p class="text-slate-400 text-sm">🟣 جلسات حضوری</p>
+                        <p id="statMeeting" class="text-3xl font-bold mt-2">0</p>
+                    </div>
+                    <div class="bg-slate-800 rounded-lg p-6 border-r-4 border-blue-400">
+                        <p class="text-slate-400 text-sm">🔵 پیگیری مجدد</p>
+                        <p id="statCallback" class="text-3xl font-bold mt-2">0</p>
+                    </div>
+                    <div class="bg-slate-800 rounded-lg p-6 border-r-4 border-green-400">
+                        <p class="text-slate-400 text-sm">🏆 فروش موفق</p>
+                        <p id="statSold" class="text-3xl font-bold mt-2">0</p>
+                    </div>
+                </div>
+
+                <h3 class="text-xl font-bold mb-4">📋 لیدهای فوری (تلاش برای تماس)</h3>
+                <div id="urgentLeads" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <!-- جایگزینی توسط JavaScript -->
+                </div>
+            </section>
+
+            <!-- Contacts View -->
+            <section id="contactsView" class="hidden p-8">
+                <h2 class="text-3xl font-bold mb-6">👥 مشتریان</h2>
+                
+                <div class="mb-6">
+                    <input type="text" id="searchInput" placeholder="جستجو در نام یا شماره تماس..." 
+                           class="w-full px-4 py-3 rounded-lg bg-slate-700 text-white placeholder-slate-400 border border-slate-600">
+                </div>
+
+                <div id="contactsList" class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    <!-- جایگزینی توسط JavaScript -->
+                </div>
+            </section>
+
+            <!-- Tasks View -->
+            <section id="tasksView" class="hidden p-8">
+                <h2 class="text-3xl font-bold mb-6">✅ وظایف و پیگیری‌ها</h2>
+                
+                <div class="space-y-4" id="tasksList">
+                    <!-- جایگزینی توسط JavaScript -->
+                </div>
+            </section>
+
+            <!-- Add Contact Form -->
+            <section id="addContactView" class="hidden p-8">
+                <h2 class="text-3xl font-bold mb-8">➕ افزودن مشتری جدید</h2>
+                
+                <form id="addContactForm" class="bg-slate-800 rounded-lg p-8 max-w-2xl">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label class="block text-sm font-medium mb-2">نام کامل *</label>
+                            <input type="text" id="contactName" required class="w-full px-4 py-2 rounded-lg bg-slate-700 border border-slate-600 text-white">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-2">شماره تماس *</label>
+                            <input type="tel" id="contactPhone" required class="w-full px-4 py-2 rounded-lg bg-slate-700 border border-slate-600 text-white">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-2">ایمیل</label>
+                            <input type="email" id="contactEmail" class="w-full px-4 py-2 rounded-lg bg-slate-700 border border-slate-600 text-white">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-2">شهر</label>
+                            <input type="text" id="contactCity" class="w-full px-4 py-2 rounded-lg bg-slate-700 border border-slate-600 text-white">
+                        </div>
+                        <div class="md:col-span-2">
+                            <label class="block text-sm font-medium mb-2">توضیحات</label>
+                            <textarea id="contactNotes" rows="4" class="w-full px-4 py-2 rounded-lg bg-slate-700 border border-slate-600 text-white"></textarea>
+                        </div>
+                    </div>
+                    <button type="submit" class="mt-6 px-6 py-3 bg-green-600 hover:bg-green-700 rounded-lg font-bold transition">
+                        ✅ افزودن مشتری
+                    </button>
+                </form>
+            </section>
+        </main>
+    </div>
+
+    <!-- Contact Detail Modal -->
+    <div id="contactDetailModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); z-index: 1000; align-items: center; justify-content: center;">
+        <div class="bg-slate-800 rounded-lg p-8 w-full max-w-2xl max-h-96 overflow-y-auto">
+            <h3 id="modalTitle" class="text-2xl font-bold mb-6"></h3>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                <div>
+                    <p class="text-slate-400 text-sm">نام</p>
+                    <p id="modalName" class="text-lg font-bold"></p>
+                </div>
+                <div>
+                    <p class="text-slate-400 text-sm">تماس</p>
+                    <p id="modalPhone" class="text-lg font-bold"></p>
+                </div>
+                <div>
+                    <p class="text-slate-400 text-sm">وضعیت</p>
+                    <p id="modalStatus" class="text-lg font-bold mt-1"></p>
+                </div>
+                <div>
+                    <p class="text-slate-400 text-sm">تاریخ ثبت</p>
+                    <p id="modalDate" class="text-lg"></p>
+                </div>
+            </div>
+
+            <div class="mb-6 bg-slate-700 p-4 rounded-lg">
+                <p class="text-slate-400 text-sm mb-2">گزارش‌های تماس</p>
+                <div id="modalCalls" class="space-y-2 max-h-32 overflow-y-auto">
+                    <!-- جایگزینی توسط JavaScript -->
+                </div>
+            </div>
+
+            <div class="space-y-3">
+                <label class="block">
+                    <p class="text-sm font-medium mb-2">تغییر وضعیت</p>
+                    <select id="modalStatusSelect" class="w-full px-4 py-2 rounded-lg bg-slate-700 border border-slate-600 text-white">
+                        <option value="">انتخاب کنید...</option>
+                        <option value="calling">🟡 تلاش برای تماس</option>
+                        <option value="meeting">🟣 جلسه حضوری</option>
+                        <option value="callback">🔵 پیگیری مجدد</option>
+                        <option value="sold">🏆 فروش موفق</option>
+                        <option value="archived">🔴 بایگانی</option>
+                    </select>
+                </label>
+
+                <label class="block" id="callbackDateLabel" style="display: none;">
+                    <p class="text-sm font-medium mb-2">تاریخ پیگیری (تاریخ شمسی)</p>
+                    <div class="relative">
+                        <input type="text" id="callbackDateInput" readonly placeholder="انتخاب تاریخ" 
+                               class="w-full px-4 py-2 rounded-lg bg-slate-700 border border-slate-600 text-white cursor-pointer">
+                    </div>
+                </label>
+
+                <label class="block">
+                    <p class="text-sm font-medium mb-2">نتیجه تماس</p>
+                    <textarea id="modalCallResult" placeholder="مثلاً: مشتری علاقه دارد، جلسه برای فردا تنظیم شد" 
+                              rows="3" class="w-full px-4 py-2 rounded-lg bg-slate-700 border border-slate-600 text-white"></textarea>
+                </label>
+            </div>
+
+            <div class="mt-6 flex gap-3">
+                <button id="modalSaveBtn" class="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg font-bold transition">
+                    💾 ذخیره تغییرات
+                </button>
+                <button id="modalDeleteBtn" class="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg font-bold transition">
+                    🗑️ حذف
+                </button>
+                <button id="modalCloseBtn" class="flex-1 px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg font-bold transition">
+                    ✕ بستن
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Persian Date Picker Container -->
+    <div id="persianDatePicker" class="persian-date-picker" style="display: none;">
+        <div class="flex justify-between items-center mb-4">
+            <button id="prevMonth" class="px-3 py-1 bg-slate-200 rounded text-black font-bold">◀</button>
+            <div>
+                <select id="monthSelect" class="mx-2 px-2 py-1 rounded text-black">
+                    <option value="0">فروردین</option>
+                    <option value="1">اردیبهشت</option>
+                    <option value="2">خرداد</option>
+                    <option value="3">تیر</option>
+                    <option value="4">مرداد</option>
+                    <option value="5">شهریور</option>
+                    <option value="6">مهر</option>
+                    <option value="7">آبان</option>
+                    <option value="8">آذر</option>
+                    <option value="9">دی</option>
+                    <option value="10">بهمن</option>
+                    <option value="11">اسفند</option>
+                </select>
+                <input type="number" id="yearInput" class="w-20 px-2 py-1 rounded text-black" min="1300" max="1500">
+            </div>
+            <button id="nextMonth" class="px-3 py-1 bg-slate-200 rounded text-black font-bold">▶</button>
+        </div>
+        <div class="calendar-grid" id="calendarGrid">
+            <!-- جایگزینی توسط JavaScript -->
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
