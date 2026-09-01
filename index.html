@@ -1,0 +1,766 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CRM فارسی - مدیریت تماس و پیگیری مشتریان</meta>
+    <meta name="description" content="سیستم مدیریت مشتریان آفلاین‌اول، راست‌چین، با تقویم شمسی و منطق پیگیری هوشمند">
+    
+    <!-- 1. Tailwind CSS CDN + Config RTL & Font -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        'vazir': ['Vazirmatn', 'sans-serif'],
+                    },
+                    colors: {
+                        primary: { 50: '#f0f9ff', 100: '#e0f2fe', 200: '#bae6fd', 300: '#7dd3fc', 400: '#38bdf8', 500: '#0ea5e9', 600: '#0284c7', 700: '#0369a1', 800: '#075985', 900: '#0c4a6e' },
+                        status: { new: '#64748b', calling: '#f59e0b', callback: '#3b82f6', meeting: '#8b5cf6', sold: '#10b981', archived: '#ef4444' }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- 2. Font Vazirmatn CDN -->
+    <link href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css" rel="stylesheet" type="text/css" />
+
+    <!-- 3. Persian Datepicker CSS & JS Dependencies -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/persian-datepicker@0.4.5/dist/css/persian-datepicker.min.css" />
+    <script src="https://cdn.jsdelivr.net/npm/jalaali-js@1.2.5/jalaali.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/persian-datepicker@0.4.5/dist/js/persian-datepicker.min.js"></script>
+
+    <!-- 4. IDB (IndexedDB Wrapper) UMD Global -->
+    <script src="https://cdn.jsdelivr.net/npm/idb@7/build/umd/index.min.js"></script>
+
+    <!-- 5. Custom Styles -->
+    <style>
+        body { font-family: 'Vazirmatn', sans-serif; background-color: #f8fafc; }
+        .scrollbar-thin::-webkit-scrollbar { width: 6px; height: 6px; }
+        .scrollbar-thin::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 3px; }
+        .scrollbar-thin::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+        .scrollbar-thin::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        
+        /* Persian Datepicker RTL Fix */
+        .persian-datepicker { direction: rtl !important; font-family: 'Vazirmatn', sans-serif !important; }
+        .persian-datepicker .prev, .persian-datepicker .next { font-size: 1.2rem !important; }
+        
+        .kanban-column { min-height: 500px; transition: background 0.2s; }
+        .kanban-column.drag-over { background: #e0f2fe; border-color: #0ea5e9; }
+        .lead-card { transition: transform 0.2s, box-shadow 0.2s; }
+        .lead-card:hover { transform: translateY(-2px); box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1); }
+        
+        .modal-backdrop { background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(2px); }
+        .status-badge { font-size: 0.7rem; font-weight: 600; padding: 0.15rem 0.5rem; border-radius: 9999px; }
+        
+        @keyframes slideIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+        .animate-slide-in { animation: slideIn 0.3s ease-out; }
+        
+        .toast { animation: slideIn 0.3s ease-out; }
+        @keyframes fadeOut { to { opacity: 0; transform: translateX(10px); } }
+        .toast.hide { animation: fadeOut 0.3s ease-in forwards; }
+    </style>
+</head>
+<body class="font-vazir antialiased text-slate-800">
+
+<!-- ================================================== -->
+<!-- MAIN LAYOUT -->
+<!-- ================================================== -->
+<div class="flex h-screen overflow-hidden">
+    
+    <!-- SIDEBAR -->
+    <aside id="sidebar" class="fixed inset-y-0 right-0 z-40 w-64 bg-white border-l border-slate-200 transform transition-transform duration-300 lg:relative lg:translate-x-0 hidden" aria-label="منوی جانبی">
+        <div class="flex flex-col h-full">
+            <!-- Logo -->
+            <div class="flex items-center justify-between h-16 px-4 border-b border-slate-200">
+                <h1 class="text-xl font-bold text-primary-600 flex items-center gap-2">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+                    CRM فارسی
+                </h1>
+                <button id="sidebarClose" class="lg:hidden p-1 rounded hover:bg-slate-100" aria-label="بستن منو"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
+            </div>
+            
+            <!-- Navigation -->
+            <nav class="flex-1 px-3 py-4 space-y-1 overflow-y-auto" role="navigation" aria-label="منوی اصلی">
+                <a href="#" data-view="board" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-600 hover:bg-primary-50 hover:text-primary-700 font-medium transition active bg-primary-50 text-primary-700">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2"></path></svg>
+                    بورد کانبان
+                </a>
+                <a href="#" data-view="list" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-600 hover:bg-primary-50 hover:text-primary-700 font-medium transition">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+                    لیست همه لیدها
+                </a>
+                <a href="#" data-view="archive" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-600 hover:bg-primary-50 hover:text-primary-700 font-medium transition">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"></path></svg>
+                    بایگانی‌ها
+                </a>
+                <a href="#" data-view="settings" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-600 hover:bg-primary-50 hover:text-primary-700 font-medium transition">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                    تنظیمات
+                </a>
+            </nav>
+
+            <!-- Footer Stats -->
+            <div class="p-4 border-t border-slate-200 bg-slate-50 rounded-t-lg">
+                <div class="text-xs text-slate-500 mb-2">آمار کلی</div>
+                <div class="grid grid-cols-3 gap-2 text-center">
+                    <div class="bg-white p-2 rounded shadow-sm"><div id="statTotal" class="font-bold text-lg text-slate-800">0</div><div class="text-xs text-slate-500">کل لیدها</div></div>
+                    <div class="bg-white p-2 rounded shadow-sm"><div id="statActive" class="font-bold text-lg text-primary-600">0</div><div class="text-xs text-slate-500">فعال</div></div>
+                    <div class="bg-white p-2 rounded shadow-sm"><div id="statSold" class="font-bold text-lg text-emerald-600">0</div><div class="text-xs text-slate-500">فروش</div></div>
+                </div>
+            </div>
+        </div>
+    </aside>
+    <div id="sidebarOverlay" class="fixed inset-0 z-30 bg-black/50 lg:hidden hidden" aria-hidden="true"></div>
+
+    <!-- MAIN CONTENT -->
+    <main class="flex-1 flex flex-col min-w-0 lg:ml-0" role="main">
+        <!-- Top Bar -->
+        <header class="sticky top-0 z-20 h-16 bg-white/80 backdrop-blur-sm border-b border-slate-200 flex items-center justify-between px-4 lg:px-6">
+            <div class="flex items-center gap-4">
+                <button id="sidebarOpen" class="lg:hidden p-2 rounded-lg hover:bg-slate-100" aria-label="باز کردن منو"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg></button>
+                <h2 id="pageTitle" class="text-xl font-bold text-slate-800 hidden sm:block">بورد کانبان</h2>
+            </div>
+            <div class="flex items-center gap-3">
+                <div class="relative hidden md:block">
+                    <input type="text" id="globalSearch" placeholder="جستجوی نام، شماره، یادداشت..." class="w-64 pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition" aria-label="جستجوی سراسری">
+                    <svg class="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                </div>
+                <button id="btnAddLead" class="btn-primary flex items-center gap-2 px-4 py-2" aria-label="افزودن لید جدید">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                    <span class="hidden sm:inline">لید جدید</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- Page Content -->
+        <div class="flex-1 overflow-auto p-4 lg:p-6" id="appContent">
+            <!-- View: Kanban Board -->
+            <section id="view-board" class="view-pane animate-slide-in" role="region" aria-label="بورد کانبان">
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6 gap-4 scrollbar-thin" id="kanbanBoard">
+                    <!-- Columns injected by JS -->
+                </div>
+            </section>
+
+            <!-- View: List View -->
+            <section id="view-list" class="view-pane hidden animate-slide-in" role="region" aria-label="لیست لیدها">
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-right" id="leadsTable">
+                            <thead class="bg-slate-50 border-b border-slate-200">
+                                <tr>
+                                    <th class="px-4 py-3 font-medium text-slate-500">نام / شرکت</th>
+                                    <th class="px-4 py-3 font-medium text-slate-500">تلفن</th>
+                                    <th class="px-4 py-3 font-medium text-slate-500">منبع</th>
+                                    <th class="px-4 py-3 font-medium text-slate-500">وضعیت</th>
+                                    <th class="px-4 py-3 font-medium text-slate-500">پیگیری بعدی</th>
+                                    <th class="px-4 py-3 font-medium text-slate-500">عملیات</th>
+                                </tr>
+                            </thead>
+                            <tbody id="leadsTableBody" class="divide-y divide-slate-100"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- View: Archive -->
+            <section id="view-archive" class="view-pane hidden animate-slide-in" role="region" aria-label="بایگانی">
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                     <div class="overflow-x-auto">
+                        <table class="w-full text-right" id="archiveTable">
+                            <thead class="bg-slate-50 border-b border-slate-200">
+                                <tr>
+                                    <th class="px-4 py-3 font-medium text-slate-500">نام</th>
+                                    <th class="px-4 py-3 font-medium text-slate-500">تلفن</th>
+                                    <th class="px-4 py-3 font-medium text-slate-500">علت بایگانی</th>
+                                    <th class="px-4 py-3 font-medium text-slate-500">تاریخ بایگانی</th>
+                                    <th class="px-4 py-3 font-medium text-slate-500">بازگردانی</th>
+                                </tr>
+                            </thead>
+                            <tbody id="archiveTableBody" class="divide-y divide-slate-100"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- View: Settings -->
+            <section id="view-settings" class="view-pane hidden animate-slide-in max-w-2xl mx-auto" role="region" aria-label="تنظیمات">
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 space-y-6">
+                    <h3 class="text-lg font-bold text-slate-800 flex items-center gap-2"><svg class="w-5 h-5 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg> تنظیمات برنامه</h3>
+                    
+                    <div class="space-y-4 border-t border-slate-200 pt-6">
+                        <h4 class="font-medium text-slate-700">مدیریت داده‌ها</h4>
+                        <div class="flex flex-wrap gap-3">
+                            <button id="btnExport" class="btn-secondary flex items-center gap-2"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg> خروجی JSON (بکاپ)</button>
+                            <label class="btn-secondary flex items-center gap-2 cursor-pointer"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg> وارد کردن JSON <input type="file" id="importFile" accept=".json" class="hidden" onchange="handleImport(event)"></label>
+                            <button id="btnClearAll" class="btn-danger flex items-center gap-2"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg> پاک کردن همه داده‌ها</button>
+                        </div>
+                        <p class="text-sm text-slate-500">داده‌ها در حافظه مرورگر (IndexedDB) ذخیره می‌شوند. بکاپ منظم فراموش نشود.</p>
+                    </div>
+
+                    <div class="border-t border-slate-200 pt-6">
+                        <h4 class="font-medium text-slate-700">راهنمای فرمول پیگیری (مرلین)</h4>
+                        <div class="bg-slate-50 p-4 rounded-lg text-sm text-slate-600 space-y-2">
+                            <p><strong>منطق پیش‌فرض:</strong> در صورت عدم پاسخ، فاصله پیگیری به صورت نمایی (۲ به توان n) محاسبه می‌شود.</p>
+                            <ul class="list-disc list-inside space-y-1">
+                                <li>بار ۱ عدم پاسخ: ۲ روز بعد</li>
+                                <li>بار ۲ عدم پاسخ: ۴ روز بعد</li>
+                                <li>بار ۳ عدم پاسخ: ۸ روز بعد</li>
+                                <li>بار ۴ عدم پاسخ: <span class="text-red-600 font-medium">بایگانی خودکار</span></li>
+                            </ul>
+                            <p class="text-xs text-slate-400">در پاسخ دادن، شمارنده ریست شده و کاربر تصمیم نهایی (جلسه، فروش، پیگیری، بایگانی) را ثبت می‌کند.</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </main>
+</div>
+
+<!-- ================================================== -->
+-- MODALS -->
+<!-- ================================================== -->
+
+<!-- Modal: Add/Edit Lead -->
+<div id="modalLead" class="fixed inset-0 z-50 hidden modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="modalLeadTitle">
+    <div class="flex min-h-full items-center justify-center p-4">
+        <div class="w-full max-w-lg bg-white rounded-2xl shadow-xl animate-slide-in max-h-[90vh] overflow-y-auto">
+            <div class="flex items-center justify-between p-4 border-b border-slate-200 sticky top-0 bg-white rounded-t-2xl z-10">
+                <h3 id="modalLeadTitle" class="text-lg font-bold text-slate-800">افزودن لید جدید</h3>
+                <button onclick="closeModal('modalLead')" class="p-1 rounded hover:bg-slate-100" aria-label="بستن"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
+            </div>
+            <form id="formLead" class="p-4 space-y-4" novalidate>
+                <input type="hidden" id="leadId" name="id">
+                <div>
+                    <label for="leadName" class="block text-sm font-medium text-slate-700 mb-1">نام و نام خانوادگی / نام شرکت <span class="text-red-500">*</span></label>
+                    <input type="text" id="leadName" name="name" required class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition" placeholder="مثال: شرکت آتیس یا علی محمدی">
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label for="leadPhone" class="block text-sm font-medium text-slate-700 mb-1">شماره تماس <span class="text-red-500">*</span></label>
+                        <input type="tel" id="leadPhone" name="phone" required dir="ltr" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition" placeholder="۰۹۱۲۳۴۵۶۷۸۹">
+                    </div>
+                    <div>
+                        <label for="leadSource" class="block text-sm font-medium text-slate-700 mb-1">منبع لید</label>
+                        <select id="leadSource" name="source" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition bg-white">
+                            <option value="web">وب‌سایت</option>
+                            <option value="instagram">اینستاگرام</option>
+                            <option value="referral">معرفی</option>
+                            <option value="ads">تبلیغات</option>
+                            <option value="other">سایر</option>
+                        </select>
+                    </div>
+                </div>
+                <div>
+                    <label for="leadNotes" class="block text-sm font-medium text-slate-700 mb-1">یادداشت اولیه</label>
+                    <textarea id="leadNotes" name="notes" rows="3" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition" placeholder="اطلاعات اولیه، نیازها، بودجه..."></textarea>
+                </div>
+                <div class="flex justify-end gap-3 pt-4 border-t border-slate-200 sticky bottom-0 bg-white rounded-b-2xl">
+                    <button type="button" onclick="closeModal('modalLead')" class="btn-secondary">انصراف</button>
+                    <button type="submit" class="btn-primary">ذخیره لید</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Call Workflow (Core Engine) -->
+<div id="modalCall" class="fixed inset-0 z-50 hidden modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="modalCallTitle">
+    <div class="flex min-h-full items-center justify-center p-4">
+        <div class="w-full max-w-md bg-white rounded-2xl shadow-xl animate-slide-in">
+            <div class="flex items-center justify-between p-4 border-b border-slate-200 sticky top-0 bg-white rounded-t-2xl z-10">
+                <h3 id="modalCallTitle" class="text-lg font-bold text-slate-800">ثبت نتیجه تماس</h3>
+                <button onclick="closeModal('modalCall')" class="p-1 rounded hover:bg-slate-100" aria-label="بستن"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
+            </div>
+            
+            <!-- Step 1: Call Result -->
+            <div id="callStep1" class="p-4 space-y-4">
+                <div class="text-center py-2">
+                    <p class="text-sm text-slate-500">تماس با <strong id="callLeadName" class="text-slate-800"></strong></p>
+                    <p class="text-xs text-slate-400" id="callLeadPhone"></p>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <button type="button" onclick="handleCallResult(true)" class="btn-success py-3 flex items-center justify-center gap-2">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+                        پاسخ داد ✅
+                    </button>
+                    <button type="button" onclick="handleCallResult(false)" class="btn-warning py-3 flex items-center justify-center gap-2">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                        پاسخ نداد ❌
+                    </button>
+                </div>
+            </div>
+
+            <!-- Step 2: Outcome (Answered) -->
+            <div id="callStep2" class="p-4 space-y-4 hidden">
+                <div class="text-center text-sm text-slate-500">نتیجه گفتگو را انتخاب کنید:</div>
+                <div class="space-y-2" id="outcomeButtons">
+                    <button type="button" onclick="showOutcomeForm('meeting')" class="w-full text-right p-3 border border-slate-200 rounded-lg hover:bg-primary-50 hover:border-primary-300 transition flex items-center justify-between">
+                        <span class="flex items-center gap-2 text-slate-700"><svg class="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg> تنظیم جلسه حضوری</span>
+                        <svg class="w-5 h-5 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                    </button>
+                    <button type="button" onclick="showOutcomeForm('sold')" class="w-full text-right p-3 border border-slate-200 rounded-lg hover:bg-emerald-50 hover:border-emerald-300 transition flex items-center justify-between">
+                        <span class="flex items-center gap-2 text-slate-700"><svg class="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg> صدور بیمه‌نامه / فروش نهایی</span>
+                        <svg class="w-5 h-5 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                    </button>
+                    <button type="button" onclick="showOutcomeForm('callback')" class="w-full text-right p-3 border border-slate-200 rounded-lg hover:bg-blue-50 hover:border-blue-300 transition flex items-center justify-between">
+                        <span class="flex items-center gap-2 text-slate-700"><svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg> پیگیری مجدد (تعیین تاریخ)</span>
+                        <svg class="w-5 h-5 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                    </button>
+                    <button type="button" onclick="showOutcomeForm('archived')" class="w-full text-right p-3 border border-slate-200 rounded-lg hover:bg-red-50 hover:border-red-300 transition flex items-center justify-between">
+                        <span class="flex items-center gap-2 text-slate-700"><svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg> عدم تمایل / بایگانی</span>
+                        <svg class="w-5 h-5 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                    </button>
+                </div>
+                <button onclick="backToCallResult()" class="w-full text-center text-sm text-slate-500 hover:text-slate-700 mt-2">بازگشت</button>
+            </div>
+
+            <!-- Step 3: Dynamic Forms -->
+            <div id="callStep3" class="p-4 space-y-4 hidden">
+                <div id="dynamicFormContent"></div>
+                <div class="flex justify-end gap-3 pt-4 border-t border-slate-200">
+                    <button onclick="backToOutcomeSelection()" class="btn-secondary">بازگشت</button>
+                    <button id="btnConfirmOutcome" class="btn-primary" disabled>تایید و ثبت</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Toast Container -->
+<div id="toastContainer" class="fixed bottom-4 left-4 z-50 flex flex-col gap-2" aria-live="polite"></div>
+
+<!-- ================================================== -->
+-- APPLICATION LOGIC (JavaScript) -->
+<!-- ================================================== -->
+<script>
+/* ================================================================
+   1. CONFIGURATION & CONSTANTS
+   ================================================================ */
+const DB_NAME = 'PersianCRM_DB', STORE_NAME = 'leads', DB_VERSION = 1;
+const STATUS_CONFIG = {
+    new: { label: 'سرنخ جدید', color: 'status-new', icon: 'user-plus', order: 1 },
+    calling: { label: 'تلاش برای تماس', color: 'status-calling', icon: 'phone', order: 2 },
+    callback: { label: 'پیگیری مجدد', color: 'status-callback', icon: 'clock', order: 3 },
+    meeting: { label: 'جلسه حضوری', color: 'status-meeting', icon: 'calendar-check', order: 4 },
+    sold: { label: 'فروش موفق', color: 'status-sold', icon: 'check-circle', order: 5 },
+    archived: { label: 'بایگانی', color: 'status-archived', icon: 'archive', order: 6 }
+};
+const BOARD_STATUSES = ['new', 'calling', 'callback', 'meeting', 'sold']; // Archived hidden from board
+let db = null;
+let currentView = 'board';
+let currentLeadForCall = null;
+let currentOutcomeType = null;
+let persianDatepickerInstance = null;
+
+// ================================================================
+// 2. DATABASE LAYER (IndexedDB via idb)
+// ================================================================
+async function initDB() {
+    if (db) return db;
+    try {
+        db = await idb.openDB(DB_NAME, DB_VERSION, {
+            upgrade(database) {
+                const store = database.createObjectStore(STORE_NAME, { keyPath: 'id', autoIncrement: true });
+                store.createIndex('status', 'status');
+                store.createIndex('nextFollowUp', 'nextFollowUpDate'); // Gregorian timestamp for sorting
+                store.createIndex('createdAt', 'createdAt');
+                store.createIndex('phone', 'phone', { unique: false });
+            }
+        });
+        console.log('DB Ready');
+        return db;
+    } catch (e) { console.error('DB Init Failed', e); showToast('خطا در راه‌اندازی پایگاه داده مرورگر', 'error'); }
+}
+
+async function getAllLeads() { await initDB(); return db.getAllFromIndex(STORE_NAME, 'createdAt').then(arr => arr.reverse()); } // Newest first
+async function getLeadsByStatus(status) { await initDB(); return db.getAllFromIndex(STORE_NAME, 'status', status); }
+async function saveLead(lead) { await initDB(); const tx = db.transaction(STORE_NAME, 'readwrite'); lead.updatedAt = Date.now(); if(!lead.createdAt) lead.createdAt = lead.updatedAt; await tx.store.put(lead); await tx.done; return lead; }
+async function deleteLead(id) { await initDB(); await db.delete(STORE_NAME, id); }
+async function getLead(id) { await initDB(); return db.get(STORE_NAME, id); }
+async function clearAllData() { await initDB(); await db.clear(STORE_NAME); }
+
+// ================================================================
+// 3. UTILITIES: Date, Toast, Icons
+// ================================================================
+function toGregorian(jy, jm, jd) { return jalaali.toGregorian(jy, jm, jd); }
+function toJalaali(gy, gm, gd) { return jalaali.toJalaali(gy, gm, gd); }
+function formatJDate(dateObj) { if(!dateObj) return '-'; const d = dateObj instanceof Date ? dateObj : new Date(dateObj); const {jy, jm, jd} = toJalaali(d.getFullYear(), d.getMonth()+1, d.getDate()); return `${jy}/${String(jm).padStart(2,'0')}/${String(jd).padStart(2,'0')}`; }
+function parseJDate(str) { if(!str) return null; const parts = str.split('/').map(Number); if(parts.length!==3) return null; const {gy, gm, gd} = toGregorian(parts[0], parts[1], parts[2]); return new Date(gy, gm-1, gd); }
+function addDays(date, days) { const d = new Date(date); d.setDate(d.getDate() + days); return d; }
+function getStatusConfig(status) { return STATUS_CONFIG[status] || STATUS_CONFIG.new; }
+function getStatusIcon(name) { const icons = { 'user-plus': '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"></path>', 'phone': '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"></path>', 'clock': '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>', 'calendar-check': '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4"></path>', 'check-circle': '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>', 'archive': '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"></path>' }; return icons[name] || ''; }
+function renderBadge(status) { const c = getStatusConfig(status); return `<span class="status-badge bg-[${c.color}]/10 text-[${c.color}]"><svg class="inline w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">${getStatusIcon(c.icon)}</svg>${c.label}</span>`; }
+function showToast(msg, type='info') { const c = { info: 'bg-slate-700', success: 'bg-emerald-600', error: 'bg-red-600', warning: 'bg-amber-600' }; const el = document.createElement('div'); el.className = `toast ${c[type]} text-white px-4 py-3 rounded-lg shadow-lg flex items-center gap-3 min-w-[250px] max-w-md`; el.innerHTML = `<span class="flex-1">${msg}</span><button onclick="this.parentElement.classList.add('hide'); setTimeout(()=>this.parentElement.remove(),300)" class="text-white/70 hover:text-white">✕</button>`; document.getElementById('toastContainer').appendChild(el); setTimeout(() => { if(el.parentElement) { el.classList.add('hide'); setTimeout(()=>el.remove(),300); } }, 5000); }
+function openModal(id) { document.getElementById(id).classList.remove('hidden'); document.body.style.overflow='hidden'; }
+function closeModal(id) { document.getElementById(id).classList.add('hidden'); document.body.style.overflow=''; }
+function setActiveNav(view) { currentView = view; document.querySelectorAll('.nav-link').forEach(a=>a.classList.toggle('active', a.dataset.view===view)); document.querySelectorAll('.view-pane').forEach(v=>v.classList.toggle('hidden', v.id!==`view-${view}`)); document.getElementById('pageTitle').textContent = document.querySelector(`.nav-link[data-view="${view}"]`)?.textContent.trim() || ''; renderCurrentView(); closeSidebar(); }
+
+// ================================================================
+// 4. CORE BUSINESS LOGIC (Mermaid Implementation)
+// ================================================================
+
+// --- Dynamic Delay Formula: 2^n days ---
+function calculateNextFollowUp(attemptCount) { // attemptCount is 1-based for the *next* attempt
+    if (attemptCount >= 4) return null; // Archive
+    const days = Math.pow(2, attemptCount); // 2^1=2, 2^2=4, 2^3=8
+    return addDays(new Date(), days);
+}
+
+// --- State Transition Engine ---
+async function processCallOutcome(leadId, answered, outcomeData) {
+    const lead = await getLead(leadId);
+    if (!lead) return showToast('لید یافت نشد', 'error');
+
+    let updates = { 
+        lastCallDate: Date.now(), 
+        notes: (lead.notes || '') + `\n[${formatJDate(new Date())}] ${outcomeData.note || ''}`.trim() 
+    };
+
+    if (!answered) {
+        // Branch: Not Answered
+        const newCount = (lead.callAttempts || 0) + 1;
+        updates.callAttempts = newCount;
+        
+        if (newCount >= 4) {
+            // Auto Archive (Mermaid: CheckCount >= 4 -> AutoArchive)
+            updates.status = 'archived';
+            updates.archiveReason = 'عدم پاسخ پس از ۴ تلاش متوالی (سیستم اتوماتیک)';
+            updates.archivedAt = Date.now();
+            showToast('لید به دلیل ۴ بار عدم پاسخ، به صورت خودکار بایگانی شد.', 'warning');
+        } else {
+            // Dynamic Delay (Mermaid: DynamicDelay)
+            const nextDate = calculateNextFollowUp(newCount);
+            updates.status = 'callback';
+            updates.nextFollowUpDate = nextDate.getTime();
+            showToast(`تماس بی‌نتیجه. پیگیری ${newCount + 1} در ${formatJDate(nextDate)} تنظیم شد.`, 'info');
+        }
+    } else {
+        // Branch: Answered
+        updates.callAttempts = 0; // ResetCounter
+        updates.status = outcomeData.newStatus;
+        
+        if (outcomeData.newStatus === 'meeting' || outcomeData.newStatus === 'callback') {
+            updates.nextFollowUpDate = outcomeData.date.getTime();
+        } else {
+            updates.nextFollowUpDate = null; // Sold or Archived (manual) usually no followup
+        }
+        if (outcomeData.newStatus === 'archived') {
+            updates.archiveReason = outcomeData.reason;
+            updates.archivedAt = Date.now();
+        }
+        if (outcomeData.newStatus === 'sold') {
+            updates.soldAt = Date.now();
+        }
+        showToast(`وضعیت به «${getStatusConfig(outcomeData.newStatus).label}» تغییر یافت.`, 'success');
+    }
+
+    await saveLead({ ...lead, ...updates });
+    renderCurrentView();
+}
+
+// ================================================================
+// 5. UI RENDERING
+// ================================================================
+function renderCurrentView() {
+    if(currentView === 'board') renderBoard();
+    else if(currentView === 'list') renderList();
+    else if(currentView === 'archive') renderArchive();
+    updateStats();
+}
+
+async function updateStats() {
+    const leads = await getAllLeads();
+    document.getElementById('statTotal').textContent = leads.length;
+    document.getElementById('statActive').textContent = leads.filter(l => !['sold','archived'].includes(l.status)).length;
+    document.getElementById('statSold').textContent = leads.filter(l => l.status === 'sold').length;
+}
+
+// --- Kanban Board ---
+async function renderBoard() {
+    const board = document.getElementById('kanbanBoard');
+    board.innerHTML = '';
+    const leads = await getAllLeads();
+    const search = document.getElementById('globalSearch').value.toLowerCase();
+    const filtered = leads.filter(l => !search || l.name.toLowerCase().includes(search) || l.phone.includes(search) || (l.notes||'').toLowerCase().includes(search));
+    
+    // Group by status
+    const groups = {};
+    BOARD_STATUSES.forEach(s => groups[s] = []);
+    filtered.forEach(l => { if(groups[l.status]) groups[l.status].push(l); else groups['new'].push(l); }); // Fallback
+
+    BOARD_STATUSES.forEach(status => {
+        const cfg = getStatusConfig(status);
+        const col = document.createElement('div');
+        col.className = 'kanban-column bg-slate-50 rounded-xl border-2 border-slate-200 flex flex-col';
+        col.dataset.status = status;
+        
+        // Drag & Drop Visuals (Simple)
+        col.addEventListener('dragover', e => { e.preventDefault(); col.classList.add('drag-over'); });
+        col.addEventListener('dragleave', () => col.classList.remove('drag-over'));
+        col.addEventListener('drop', e => { e.preventDefault(); col.classList.remove('drag-over'); handleDrop(e, status); });
+
+        col.innerHTML = `
+            <div class="p-3 border-b border-slate-200 flex items-center justify-between bg-white rounded-t-xl">
+                <div class="flex items-center gap-2">
+                    <svg class="w-5 h-5 text-[${cfg.color}]" fill="none" stroke="currentColor" viewBox="0 0 24 24">${getStatusIcon(cfg.icon)}</svg>
+                    <span class="font-semibold text-slate-700">${cfg.label}</span>
+                </div>
+                <span class="bg-[${cfg.color}]/10 text-[${cfg.color}] text-xs font-bold px-2 py-0.5 rounded-full" id="count-${status}">${groups[status]?.length || 0}</span>
+            </div>
+            <div class="flex-1 overflow-y-auto p-3 space-y-3" id="column-${status}" role="list" aria-label="لیدهای ${cfg.label}">
+                ${groups[status]?.map(lead => renderLeadCard(lead)).join('') || '<div class="text-center text-slate-400 py-8 text-sm">لیدی در این مرحله نیست</div>'}
+            </div>
+        `;
+        board.appendChild(col);
+    });
+}
+
+function renderLeadCard(lead) {
+    const cfg = getStatusConfig(lead.status);
+    const followup = lead.nextFollowUpDate ? `<div class="flex items-center gap-1 text-xs text-slate-500"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>${formatJDate(lead.nextFollowUpDate)}</div>` : '';
+    const attempts = lead.callAttempts > 0 ? `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-amber-100 text-amber-800 font-medium"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>${lead.callAttempts} تلاش</span>` : '';
+    
+    return `
+    <article class="lead-card bg-white rounded-lg border border-slate-200 p-3 shadow-sm flex flex-col" draggable="true" data-id="${lead.id}" ondragstart="dragStart(event)">
+        <div class="flex items-start justify-between gap-2 mb-2">
+            <h4 class="font-medium text-slate-800 truncate">${lead.name}</h4>
+            ${renderBadge(lead.status)}
+        </div>
+        <div class="text-sm text-slate-600 mb-2 break-all" dir="ltr">${lead.phone}</div>
+        ${followup}
+        ${attempts}
+        <div class="mt-auto pt-3 border-t border-slate-100 flex gap-2">
+            <button onclick="openCallModal(${lead.id})" class="flex-1 btn-primary text-xs py-1.5" title="تماس / پیگیری"><svg class="w-4 h-4 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"></path></svg></button>
+            <button onclick="openLeadModal(${lead.id})" class="btn-ghost text-xs py-1.5" title="ویرایش"><svg class="w-4 h-4 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg></button>
+            <button onclick="confirmDelete(${lead.id})" class="btn-ghost text-xs py-1.5 text-red-600 hover:bg-red-50" title="حذف"><svg class="w-4 h-4 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg></button>
+        </div>
+    </article>`;
+}
+
+// --- List View ---
+async function renderList() {
+    const leads = await getAllLeads();
+    const search = document.getElementById('globalSearch').value.toLowerCase();
+    const filtered = leads.filter(l => !search || l.name.toLowerCase().includes(search) || l.phone.includes(search));
+    const tbody = document.getElementById('leadsTableBody');
+    tbody.innerHTML = filtered.map(lead => `
+        <tr class="hover:bg-slate-50 transition">
+            <td class="px-4 py-3 font-medium">${lead.name}</td>
+            <td class="px-4 py-3 text-slate-600" dir="ltr">${lead.phone}</td>
+            <td class="px-4 py-3 text-sm text-slate-500">${lead.source}</td>
+            <td class="px-4 py-3">${renderBadge(lead.status)}</td>
+            <td class="px-4 py-3 text-sm text-slate-500">${lead.nextFollowUpDate ? formatJDate(lead.nextFollowUpDate) : '-'}</td>
+            <td class="px-4 py-3">
+                <div class="flex items-center justify-end gap-2">
+                    <button onclick="openCallModal(${lead.id})" class="btn-primary text-xs px-3 py-1">تماس</button>
+                    <button onclick="openLeadModal(${lead.id})" class="btn-ghost p-1"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg></button>
+                    <button onclick="confirmDelete(${lead.id})" class="btn-ghost p-1 text-red-600"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg></button>
+                </div>
+            </td>
+        </tr>
+    `).join('');
+}
+
+// --- Archive View ---
+async function renderArchive() {
+    const leads = await getLeadsByStatus('archived');
+    const tbody = document.getElementById('archiveTableBody');
+    tbody.innerHTML = leads.map(lead => `
+        <tr class="hover:bg-slate-50 transition">
+            <td class="px-4 py-3 font-medium">${lead.name}</td>
+            <td class="px-4 py-3 text-slate-600" dir="ltr">${lead.phone}</td>
+            <td class="px-4 py-3 text-sm text-slate-500">${lead.archiveReason || 'بدون دلیل'}</td>
+            <td class="px-4 py-3 text-sm text-slate-500">${lead.archivedAt ? formatJDate(lead.archivedAt) : '-'}</td>
+            <td class="px-4 py-3"><button onclick="restoreLead(${lead.id})" class="btn-secondary text-xs px-3 py-1">بازگردانی</button></td>
+        </tr>
+    `).join('');
+}
+
+async function restoreLead(id) {
+    const lead = await getLead(id);
+    if(lead) { lead.status = 'new'; lead.archiveReason = null; lead.archivedAt = null; lead.callAttempts = 0; await saveLead(lead); showToast('لید به حالت سرنخ جدید بازگشت.', 'success'); renderCurrentView(); }
+}
+
+// ================================================================
+// 6. EVENT HANDLERS & MODAL LOGIC
+// ================================================================
+
+// --- Lead Form ---
+document.getElementById('formLead').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const form = e.target;
+    const id = form.id.value ? parseInt(form.id.value) : undefined;
+    const lead = {
+        name: form.name.value.trim(),
+        phone: form.phone.value.trim(),
+        source: form.source.value,
+        notes: form.notes.value.trim(),
+        status: id ? (await getLead(id)).status : 'new', // Preserve status on edit
+        callAttempts: 0,
+        nextFollowUpDate: null
+    };
+    if(!lead.name || !lead.phone) return showToast('نام و شماره الزامی است', 'error');
+    if(id) lead.id = id;
+    await saveLead(lead);
+    showToast(id ? 'لید بروزرسانی شد' : 'لید جدید ثبت شد', 'success');
+    closeModal('modalLead');
+    renderCurrentView();
+});
+
+function openLeadModal(id = null) {
+    const form = document.getElementById('formLead');
+    form.reset();
+    document.getElementById('modalLeadTitle').textContent = id ? 'ویرایش لید' : 'افزودن لید جدید';
+    if(id) {
+        getLead(id).then(lead => {
+            if(lead) { form.id.value = lead.id; form.name.value = lead.name; form.phone.value = lead.phone; form.source.value = lead.source; form.notes.value = lead.notes || ''; openModal('modalLead'); }
+        });
+    } else { openModal('modalLead'); }
+}
+
+// --- Call Workflow Modal (The Core Engine UI) ---
+function openCallModal(leadId) {
+    getLead(leadId).then(lead => {
+        if(!lead) return;
+        currentLeadForCall = lead;
+        // Step 1: Set status to 'Calling' immediately upon opening? 
+        // Mermaid: Start -> State_Call (Change status to Calling). 
+        // We do this when user clicks "Call" button.
+        lead.status = 'calling';
+        saveLead(lead).then(() => {
+            document.getElementById('callLeadName').textContent = lead.name;
+            document.getElementById('callLeadPhone').textContent = lead.phone;
+            showStep(1);
+            openModal('modalCall');
+        });
+    });
+}
+
+function showStep(step) {
+    document.getElementById('callStep1').classList.toggle('hidden', step !== 1);
+    document.getElementById('callStep2').classList.toggle('hidden', step !== 2);
+    document.getElementById('callStep3').classList.toggle('hidden', step !== 3);
+}
+
+function handleCallResult(answered) {
+    if (!answered) {
+        // Mermaid: CheckCall -> No -> IncCount -> CheckCount -> DynamicDelay/AutoArchive
+        // We process immediately and close modal.
+        processCallOutcome(currentLeadForCall.id, false, {});
+        closeModal('modalCall');
+    } else {
+        // Mermaid: CheckCall -> Yes -> ResetCounter -> ChooseOutcome
+        showStep(2);
+    }
+}
+
+function backToCallResult() { showStep(1); }
+
+function showOutcomeForm(type) {
+    currentOutcomeType = type;
+    showStep(3);
+    const content = document.getElementById('dynamicFormContent');
+    const btn = document.getElementById('btnConfirmOutcome');
+    btn.disabled = false;
+    btn.onclick = () => confirmOutcome();
+    
+    let html = '';
+    if(type === 'meeting' || type === 'callback') {
+        const label = type === 'meeting' ? 'تاریخ جلسه' : 'تاریخ پیگیری مجدد';
+        html = `<label class="block text-sm font-medium text-slate-700 mb-1">${label} <span class="text-red-500">*</span></label>
+                <input type="text" id="outcomeDate" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500" placeholder="انتخاب تاریخ شمسی" readonly>
+                <label class="block text-sm font-medium text-slate-700 mt-3 mb-1">یادداشت</label>
+                <textarea id="outcomeNote" rows="2" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"></textarea>`;
+    } else if(type === 'archived') {
+        html = `<label class="block text-sm font-medium text-slate-700 mb-1">علت بایگانی <span class="text-red-500">*</span></label>
+                <select id="archiveReason" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white">
+                    <option value="عدم تمایل">عدم تمایل به خرید</option>
+                    <option value="قیمتی">قیمت بالا / بودجه ندارد</option>
+                    <option value="رقیب">خرید از رقیب</option>
+                    <option value="زمان">زمان مناسب نیست</option>
+                    <option value="سایر">سایر دلایل</option>
+                </select>
+                <label class="block text-sm font-medium text-slate-700 mt-3 mb-1">توضیحات بیشتر</label>
+                <textarea id="outcomeNote" rows="2" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"></textarea>`;
+    } else { // Sold
+        html = `<div class="text-center py-4"><svg class="w-12 h-12 mx-auto text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg><p class="mt-2 text-slate-600">آیا فروش نهایی تایید می‌شود؟</p></div>
+                <label class="block text-sm font-medium text-slate-700 mt-3 mb-1">یادداشت فاکتور/پلیس</label>
+                <textarea id="outcomeNote" rows="2" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"></textarea>`;
+    }
+    content.innerHTML = html;
+    
+    // Init Persian Datepicker if needed
+    if(type === 'meeting' || type === 'callback') {
+        setTimeout(() => {
+            if(persianDatepickerInstance) persianDatepickerInstance.destroy();
+            persianDatepickerInstance = new persianDatepicker(document.getElementById('outcomeDate'), {
+                format: 'YYYY/MM/DD',
+                initialValue: false,
+                autoClose: true,
+                observer: true,
+                position: 'auto',
+                altField: null,
+                calendar: { persian: { locale: 'fa' } }
+            });
+        }, 50);
+    }
+}
+
+function backToOutcomeSelection() { showStep(2); currentOutcomeType = null; }
+
+function confirmOutcome() {
+    let outcomeData = { newStatus: currentOutcomeType, note: document.getElementById('outcomeNote')?.value || '' };
+    
+    if (currentOutcomeType === 'meeting' || currentOutcomeType === 'callback') {
+        const dateStr = document.getElementById('outcomeDate').value;
+        const date = parseJDate(dateStr);
+        if(!date) return showToast('تاریخ معتبر انتخاب کنید', 'error');
+        outcomeData.date = date;
+    }
+    if (currentOutcomeType === 'archived') {
+        outcomeData.reason = document.getElementById('archiveReason').value + (outcomeData.note ? ` - ${outcomeData.note}` : '');
+    }
+    
+    processCallOutcome(currentLeadForCall.id, true, outcomeData);
+    closeModal('modalCall');
+}
+
+// --- Delete ---
+function confirmDelete(id) { if(confirm('آیا از حذف این لید اطمینان دارید؟')) { deleteLead(id).then(()=>{ showToast('لید حذف شد', 'success'); renderCurrentView(); }); } }
+
+// --- Import/Export ---
+document.getElementById('btnExport').onclick = async () => { const leads = await getAllLeads(); const blob = new Blob([JSON.stringify(leads, null, 2)], {type: 'application/json'}); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `crm-backup-${formatJDate(new Date())}.json`; a.click(); URL.revokeObjectURL(url); showToast('بکاپ دانلود شد', 'success'); };
+function handleImport(e) { const file = e.target.files[0]; if(!file) return; const reader = new FileReader(); reader.onload = async (ev) => { try { const data = JSON.parse(ev.target.result); if(Array.isArray(data)) { await clearAllData(); for(const l of data) await saveLead(l); showToast(`${data.length} لید وارد شد`, 'success'); renderCurrentView(); } else throw 'فرمت نامعتبر'; } catch(err) { showToast('خطا در فایل JSON', 'error'); } e.target.value = ''; }; reader.readAsText(file); }
+document.getElementById('btnClearAll').onclick = () => { if(confirm('⚠️ تمام لیدها، تاریخچه و تنظیمات برای همیشه حذف می‌شوند. مطمئن هستید؟')) { clearAllData().then(()=>{ showToast('پایگاه داده خالی شد', 'warning'); renderCurrentView(); }); } };
+
+// --- Drag & Drop (Simple Kanban Move) ---
+function dragStart(e) { e.dataTransfer.setData('text/plain', e.target.dataset.id); e.target.classList.add('opacity-50'); }
+function handleDrop(e, newStatus) { const id = parseInt(e.dataTransfer.getData('text/plain')); if(id) { getLead(id).then(lead => { if(lead && lead.status !== newStatus) { lead.status = newStatus; if(newStatus === 'calling') lead.callAttempts = 0; saveLead(lead).then(renderCurrentView); } }); } }
+
+// --- Sidebar & Search ---
+function toggleSidebar() { document.getElementById('sidebar').classList.toggle('hidden'); document.getElementById('sidebarOverlay').classList.toggle('hidden'); }
+function closeSidebar() { document.getElementById('sidebar').classList.add('hidden'); document.getElementById('sidebarOverlay').classList.add('hidden'); }
+document.getElementById('sidebarOpen').onclick = toggleSidebar;
+document.getElementById('sidebarClose').onclick = closeSidebar;
+document.getElementById('sidebarOverlay').onclick = closeSidebar;
+document.querySelectorAll('.nav-link').forEach(a => a.onclick = (e) => { e.preventDefault(); setActiveNav(a.dataset.view); });
+document.getElementById('globalSearch').addEventListener('input', debounce(renderCurrentView, 300));
+function debounce(fn, delay) { let t; return (...args) => { clearTimeout(t); t = setTimeout(() => fn.apply(this, args), delay); }; }
+
+// ================================================================
+// 7. INITIALIZATION
+// ================================================================
+document.addEventListener('DOMContentLoaded', async () => {
+    await initDB();
+    renderCurrentView();
+    
+    // PWA Install Prompt (Optional but nice)
+    let deferredPrompt;
+    window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); deferredPrompt = e; }); 
+});
+</script>
+</body>
+</html>
